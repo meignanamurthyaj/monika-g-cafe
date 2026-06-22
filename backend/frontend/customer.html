@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monika G Cafe - Customers</title>
+    <link rel="stylesheet" href="css/main.css">
+    <style>
+        .customer-workspace {
+            display: grid;
+            grid-template-columns: 340px 1fr;
+            gap: 2rem;
+            align-items: start;
+        }
+        .points-display {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--accent);
+            margin-top: 1rem;
+            text-align: center;
+        }
+        .spacer-card {
+            margin-top: 1.5rem;
+        }
+        .error-text {
+            color: #d32f2f;
+            font-weight: bold;
+        }
+        .success-text {
+            color: #2e7d32;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar" id="sidebar-container"></div>
+    
+    <main class="main-content">
+        <h1>Customer Loyalty Matrix</h1>
+        <p style="color: var(--text-secondary); margin-top: -1.5rem; margin-bottom: 2rem;">
+            Lookup guest profiles, register new entries, inspect historical ledger data, and review loyalty balance tiers.
+        </p>
+
+        <div class="customer-workspace">
+            <div class="controllers-column">
+                
+                <div class="card">
+                    <h3>Lookup Ledger</h3>
+                    <div class="form-group" style="margin-top: 1rem;">
+                        <label for="cid">Customer User ID</label>
+                        <input type="number" id="cid" value="1" required>
+                    </div>
+                    <button class="btn btn-accent" style="width: 100%;" onclick="checkCustomerMetrics()">Fetch Metrics</button>
+                    <div class="points-display" id="pointsOut">-- Pts</div>
+                </div>
+
+                <div class="card spacer-card">
+                    <h3>Register New Profile</h3>
+                    <form id="addCustomerForm" style="margin-top: 1rem;">
+                        <div class="form-group">
+                            <label for="newFn">First Name</label>
+                            <input type="text" id="newFn" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="newLn">Last Name</label>
+                            <input type="text" id="newLn" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="newEmail">Email Address</label>
+                            <input type="email" id="newEmail" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="newPhone">Phone Number</label>
+                            <input type="text" id="newPhone">
+                        </div>
+                        <div class="form-group">
+                            <label for="newPassword">Password</label>
+                            <input type="password" id="newPassword" value="Welcome123" required>
+                        </div>
+                        <button type="submit" class="btn" style="width: 100%;">Create Account</button>
+                    </form>
+                </div>
+
+            </div>
+
+            <div class="card">
+                <h3>Customer Order History</h3>
+                <div class="table-responsive-wrapper" style="width: 100%; overflow-x: auto; margin-top: 1rem;">
+                    <table style="min-width: 600px;">
+                        <thead>
+                            <tr>
+                                <th>Order ID</th>
+                                <th>Order Type</th>
+                                <th>Status</th>
+                                <th>Created Timestamp</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyGrid">
+                            <tr>
+                                <td colspan="4" style="text-align: center; color: var(--text-secondary);">
+                                    Enter a Customer ID and fetch metrics to populate records.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="js/api.js"></script>
+    <script src="js/sidebar.js"></script>
+    <script>
+        // 1. Fetch loyalty balance details and order logs
+        async function checkCustomerMetrics() {
+            const idInput = document.getElementById("cid");
+            const pointsOut = document.getElementById("pointsOut");
+            const grid = document.getElementById("historyGrid");
+
+            const id = parseInt(idInput.value);
+            if (!id) {
+                alert("Please enter a valid Customer ID.");
+                return;
+            }
+
+            pointsOut.innerText = "... Pts";
+            grid.innerHTML = `<tr><td colspan="4" style="text-align: center;">Loading records...</td></tr>`;
+
+            try {
+                // Fetch Loyalty Data
+                const loyaltyRes = await apiRequest(`/customers/${id}/loyalty`);
+                if (loyaltyRes && typeof loyaltyRes.loyalty_points !== 'undefined') {
+                    pointsOut.innerText = `${loyaltyRes.loyalty_points} Pts`;
+                } else {
+                    pointsOut.innerText = "-- Pts";
+                    grid.innerHTML = `<tr><td colspan="4" style="text-align: center;" class="error-text">Profile not found. Verify if this User ID exists.</td></tr>`;
+                    return;
+                }
+
+                // Fetch History Logs
+                const historyRes = await apiRequest(`/customers/${id}/history`);
+                if (historyRes && Array.isArray(historyRes)) {
+                    if (historyRes.length === 0) {
+                        grid.innerHTML = `<tr><td colspan="4" style="text-align: center; color: #757575;">This customer hasn't placed any orders yet.</td></tr>`;
+                    } else {
+                        grid.innerHTML = historyRes.map(order => `
+                            <tr>
+                                <td>#${order.order_id}</td>
+                                <td><strong>${order.order_type}</strong></td>
+                                <td><span style="font-weight: 600; color: var(--accent);">${order.order_status}</span></td>
+                                <td>${order.created_at ? new Date(order.created_at).toLocaleString() : 'N/A'}</td>
+                            </tr>
+                        `).join("");
+                    }
+                } else {
+                    grid.innerHTML = `<tr><td colspan="4" style="text-align: center;" class="error-text">Failed to fetch order history.</td></tr>`;
+                }
+            } catch (err) {
+                console.error(err);
+                pointsOut.innerText = "Error";
+                grid.innerHTML = `<tr><td colspan="4" style="text-align: center;" class="error-text">Network error occurred. Check browser console.</td></tr>`;
+            }
+        }
+
+        // 2. Intercept and dispatch "Register New Profile" form actions to backend API
+        document.getElementById("addCustomerForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+
+            // Assemble correct payload matching schemas.UserRegister on backend
+            const payload = {
+                first_name: document.getElementById("newFn").value,
+                last_name: document.getElementById("newLn").value,
+                email: document.getElementById("newEmail").value,
+                phone_profile: document.getElementById("newPhone").value || null,
+                password: document.getElementById("newPassword").value,
+                role_id: 4 // Explicitly forces assignment to the Customer role
+            };
+
+            // Hit the register route via the central apiRequest utility
+            const result = await apiRequest("/auth/register", "POST", payload);
+
+            if (result && result.user_id) {
+                alert(`Customer profile registered successfully! Assigned User ID: ${result.user_id}`);
+                
+                // Automatically switch lookup view to check the newly registered customer
+                document.getElementById("cid").value = result.user_id;
+                checkCustomerMetrics();
+                
+                // Reset form fields back to original states
+                document.getElementById("addCustomerForm").reset();
+                document.getElementById("newPassword").value = "Welcome123";
+            } else {
+                alert("Failed to create profile. Ensure the email address is not already registered.");
+            }
+        });
+    </script>
+</body>
+</html>

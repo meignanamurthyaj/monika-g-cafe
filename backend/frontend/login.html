@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monika G Cafe - Sign In</title>
+    <link rel="stylesheet" href="css/main.css">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body class="auth-body">
+    <div class="auth-card">
+        <div class="auth-header">
+            <div class="auth-logo">☕</div>
+            <h2>Monika G Cafe</h2>
+            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.25rem;">Operations Hub Portal</p>
+        </div>
+
+        <div class="auth-tabs">
+            <div class="auth-tab active" id="tabPassword" onclick="switchTab('password')">Password</div>
+            <div class="auth-tab" id="tabOTP" onclick="switchTab('otp')">OTP Login</div>
+        </div>
+
+        <!-- Password Login Form -->
+        <form id="passwordForm">
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" placeholder="name@example.com" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" placeholder="••••••••" required>
+            </div>
+            <button type="submit" class="btn" style="width: 100%; margin-top: 0.5rem;">Access Account</button>
+        </form>
+
+        <!-- OTP Login Form (Hidden by default) -->
+        <form id="otpForm" style="display: none;">
+            <div class="form-group">
+                <label for="otpEmail">Email Address</label>
+                <div style="display: flex; gap: 0.5rem;">
+                    <input type="email" id="otpEmail" placeholder="name@example.com">
+                    <button type="button" id="sendOtpBtn" class="btn btn-secondary" style="padding: 0 1rem; white-space: nowrap;">Send OTP</button>
+                </div>
+            </div>
+            <div class="form-group" id="otpCodeGroup" style="display: none;">
+                <label for="otpCode">Verification Code</label>
+                <input type="text" id="otpCode" placeholder="Enter 6-digit OTP" maxlength="6">
+            </div>
+            <button type="submit" id="otpSubmitBtn" class="btn" style="width: 100%; margin-top: 0.5rem; display: none;">Verify & Login</button>
+        </form>
+
+        <div class="separator">or</div>
+
+        <!-- Google OAuth Integration -->
+        <div class="google-btn-container">
+            <div id="g_id_onload"
+                 data-client_id="587332542125-k01dm767ca88v1irt7qqg9j0nh76gq44.apps.googleusercontent.com"
+                 data-callback="handleCredentialResponse"
+                 data-auto_prompt="false">
+            </div>
+            <div class="g_id_signin"
+                 data-type="standard"
+                 data-size="large"
+                 data-theme="dark"
+                 data-text="sign_in_with"
+                 data-shape="rectangular"
+                 data-logo_alignment="left"
+                 style="width: 100%;">
+            </div>
+        </div>
+        
+        <!-- Offline Mock Sign-In for testing -->
+        <div style="text-align: center; margin-top: 1rem;">
+            <a href="#" onclick="triggerMockGoogleLogin()" style="color: var(--text-secondary); font-size: 0.8rem; text-decoration: none; border-bottom: 1px dashed var(--text-secondary);">Test with Mock Google Login</a>
+        </div>
+
+        <p style="text-align: center; margin-top: 1.5rem; font-size: 0.9rem;">
+            <span style="color: var(--text-secondary)">New to the system?</span> 
+            <a href="register.html" style="color: var(--accent); font-weight: 600; text-decoration: none; margin-left: 0.25rem;">Create Account</a>
+        </p>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script>
+        function switchTab(mode) {
+            const tabPassword = document.getElementById("tabPassword");
+            const tabOTP = document.getElementById("tabOTP");
+            const passwordForm = document.getElementById("passwordForm");
+            const otpForm = document.getElementById("otpForm");
+
+            if (mode === 'password') {
+                tabPassword.classList.add("active");
+                tabOTP.classList.remove("active");
+                passwordForm.style.display = "block";
+                otpForm.style.display = "none";
+            } else {
+                tabPassword.classList.remove("active");
+                tabOTP.classList.add("active");
+                passwordForm.style.display = "none";
+                otpForm.style.display = "block";
+            }
+        }
+
+        // Email & Password login handler
+        document.getElementById("passwordForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const form = new URLSearchParams();
+            form.append("username", document.getElementById("email").value);
+            form.append("password", document.getElementById("password").value);
+            
+            const res = await apiRequest("/auth/login", "POST", form);
+            if (res && res.access_token) {
+                localStorage.setItem("access_token", res.access_token);
+                window.location.href = "dashboard.html";
+            } else {
+                alert(res && res.detail ? res.detail : "Invalid credentials provided.");
+            }
+        });
+
+        // OTP send request handler
+        document.getElementById("sendOtpBtn").addEventListener("click", async () => {
+            const email = document.getElementById("otpEmail").value;
+            if (!email) {
+                alert("Please enter your email address first.");
+                return;
+            }
+            
+            const sendBtn = document.getElementById("sendOtpBtn");
+            sendBtn.disabled = true;
+            sendBtn.innerText = "Sending...";
+            
+            const res = await apiRequest("/auth/send-otp", "POST", { email });
+            if (res && !res.error) {
+                alert("OTP has been sent to your email (and logged in the server terminal)!");
+                document.getElementById("otpCodeGroup").style.display = "block";
+                document.getElementById("otpSubmitBtn").style.display = "block";
+                sendBtn.innerText = "Resend OTP";
+                sendBtn.disabled = false;
+            } else {
+                alert(res && res.detail ? res.detail : "Failed to send OTP.");
+                sendBtn.innerText = "Send OTP";
+                sendBtn.disabled = false;
+            }
+        });
+
+        // OTP verify login handler
+        document.getElementById("otpForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const email = document.getElementById("otpEmail").value;
+            const otpCode = document.getElementById("otpCode").value;
+            if (!email || !otpCode) {
+                alert("Please complete both fields.");
+                return;
+            }
+            
+            const res = await apiRequest("/auth/verify-otp", "POST", { email, otp_code: otpCode });
+            if (res && res.access_token) {
+                localStorage.setItem("access_token", res.access_token);
+                window.location.href = "dashboard.html";
+            } else {
+                alert(res && res.detail ? res.detail : "Verification failed. Please try again.");
+            }
+        });
+
+        // Google Authentication handler
+        async function handleCredentialResponse(response) {
+            const idToken = response.credential;
+            const res = await apiRequest("/auth/google-login", "POST", { token: idToken });
+            if (res && res.access_token) {
+                localStorage.setItem("access_token", res.access_token);
+                window.location.href = "dashboard.html";
+            } else {
+                alert(res && res.detail ? res.detail : "Google sign in verification failed.");
+            }
+        }
+        
+        // Mock Google login for local testing
+        async function triggerMockGoogleLogin() {
+            const emailInput = prompt("Enter simulated Google email prefix (e.g. monika):");
+            if (!emailInput) return;
+            const mockToken = "mock_google_token_" + emailInput.replace(/\s+/g, '').toLowerCase();
+            const res = await apiRequest("/auth/google-login", "POST", { token: mockToken });
+            if (res && res.access_token) {
+                localStorage.setItem("access_token", res.access_token);
+                window.location.href = "dashboard.html";
+            } else {
+                alert(res && res.detail ? res.detail : "Mock login failed.");
+            }
+        }
+    </script>
+</body>
+</html>

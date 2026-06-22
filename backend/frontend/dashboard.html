@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><title>Dashboard</title>
+    <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+    <div class="sidebar" id="sidebar-container"></div>
+    <main class="main-content">
+        <h1>Welcome to Monika G Cafe Operations Hub</h1>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5rem;">
+            <div class="card" style="background: #eef9f0;"><h3>Total Revenue</h3><p id="rev">Loading...</p></div>
+            <div class="card" style="background: #eaf2ff;"><h3>Orders Placed</h3><p id="ord">Loading...</p></div>
+        </div>
+    </main>
+    <script src="js/api.js"></script>
+    <script src="js/sidebar.js"></script>
+    <script>
+        async function loadMetrics() {
+            const res = await apiRequest("/reports/sales-summary");
+            if (res) {
+                document.getElementById("rev").innerText = `$${res.total_revenue}`;
+                document.getElementById("ord").innerText = res.total_orders;
+            }
+        }
+        loadMetrics();
+    </script>
+</body>
+</html>

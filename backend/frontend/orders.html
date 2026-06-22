@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Order Processing</title>
+    <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+    <div class="sidebar" id="sidebar-container"></div>
+    <main class="main-content">
+        <h1>Order Desk</h1>
+        
+        <div class="card">
+            <h3>Place Express Order</h3>
+            <form id="orderForm">
+                <div class="form-group"><label>Item ID</label><input type="number" id="itemId" required></div>
+                <div class="form-group"><label>Quantity</label><input type="number" id="qty" value="1" required></div>
+                <div class="form-group"><label>Type</label>
+                    <select id="type"><option>Dine-in</option><option>Takeaway</option></select>
+                </div>
+                <button type="submit" class="btn">Submit Order</button>
+            </form>
+        </div>
+        
+        <div class="card">
+            <h3>Live Order Queue</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Order ID</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Actions Workflow</th>
+                    </tr>
+                </thead>
+                <tbody id="queue"></tbody>
+            </table>
+        </div>
+    </main>
+
+    <script src="js/api.js"></script>
+    <script src="js/sidebar.js"></script>
+    <script>
+        // 1. Fetch data and dynamically build the workspace order table rows
+        async function loadOrders() {
+            try {
+                const list = await apiRequest("/orders/");
+                const tbody = document.getElementById("queue");
+                tbody.innerHTML = "";
+
+                if (!list || !Array.isArray(list)) return;
+
+                list.forEach(o => {
+                    const id = o.order_id;
+                    const status = o.order_status || "Pending";
+                    const type = o.order_type;
+
+                    // Compute clean operational buttons matching backend status logic
+                    let actionButtonHtml = "";
+                    if (status === "Pending") {
+                        actionButtonHtml = `<button onclick="advanceStatus(${id}, 'Preparing')" class="btn" style="padding:4px 8px; font-size:12px;">👨‍🍳 Cook</button>`;
+                    } else if (status === "Preparing") {
+                        actionButtonHtml = `<button onclick="advanceStatus(${id}, 'Completed')" class="btn" style="padding:4px 8px; font-size:12px; background-color:#2e7d32;">☕ Complete</button>`;
+                    } else {
+                        actionButtonHtml = `<span style="color:#757575; font-size:12px;">Closed</span>`;
+                    }
+
+                    // Append standalone cancel option for non-final order lines
+                    if (status !== "Completed" && status !== "Cancelled") {
+                        actionButtonHtml += ` <button onclick="advanceStatus(${id}, 'Cancelled')" class="btn" style="padding:4px 8px; font-size:12px; background-color:#d32f2f;">Cancel</button>`;
+                    }
+
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>#${id}</td>
+                            <td>${type}</td>
+                            <td><strong class="badge">${status}</strong></td>
+                            <td>${actionButtonHtml}</td>
+                        </tr>
+                    `;
+                });
+            } catch (err) {
+                console.error("Queue render tracking error:", err);
+            }
+        }
+
+        // 2. State modification secure network request dispatcher 
+        async function advanceStatus(orderId, nextStatus) {
+            try {
+                // Aligned to exact backend PATCH syntax: /orders/{id}/status?new_status=...
+                const token = localStorage.getItem("access_token");
+                const response = await fetch(`${API_URL}/orders/${orderId}/status?new_status=${nextStatus}`, {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": token ? `Bearer ${token}` : ""
+                    }
+                });
+
+                if (response.ok) {
+                    loadOrders(); // Hot reload UI layout components immediately
+                } else {
+                    const err = await response.json();
+                    alert(err.detail || "Authentication missing or insufficient privileges.");
+                }
+            } catch (error) {
+                alert("Network communication timeout error connecting to backend.");
+            }
+        }
+
+        document.getElementById("orderForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const payload = { 
+                order_type: document.getElementById("type").value, 
+                items: [{ 
+                    item_id: parseInt(document.getElementById("itemId").value), 
+                    quantity: parseInt(document.getElementById("qty").value), 
+                    unit_price: 5.0 
+                }] 
+            };
+            await apiRequest("/orders/", "POST", payload);
+            loadOrders();
+        });
+
+        // Initialize and setup polling intervals
+        loadOrders();
+        setInterval(loadOrders, 10000); // 10s auto refresh lifecycle hook
+    </script>
+</body>
+</html>

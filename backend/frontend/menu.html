@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><title>Menu Management</title>
+    <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+    <div class="sidebar" id="sidebar-container"></div>
+    <main class="main-content">
+        <h1>Menu Catalog</h1>
+        <div class="card">
+            <h3>Add New Item</h3>
+            <form id="menuForm" style="display:flex; gap:1rem; align-items:flex-end;">
+                <div class="form-group"><label>Item Name</label><input type="text" id="name" required></div>
+                <div class="form-group"><label>Price ($)</label><input type="number" step="0.01" id="price" required></div>
+                <div class="form-group"><label>Category ID</label><input type="number" id="cat" value="1" required></div>
+                <button type="submit" class="btn" style="height:38px; margin-bottom:1.2rem;">Save Item</button>
+            </form>
+        </div>
+        <div class="card">
+            <table>
+                <thead><tr><th>ID</th><th>Name</th><th>Price</th><th>Availability</th></tr></thead>
+                <tbody id="menuGrid"></tbody>
+            </table>
+        </div>
+    </main>
+    <script src="js/api.js"></script>
+    <script src="js/sidebar.js"></script>
+    <script>
+        async function fetchMenu() {
+            const items = await apiRequest("/menu/");
+            const grid = document.getElementById("menuGrid");
+            grid.innerHTML = items.map(i => `<tr><td>${i.item_id}</td><td>${i.name}</td><td>$${i.price}</td><td>${i.is_available ? "In Stock" : "Out"}</td></tr>`).join("");
+        }
+        document.getElementById("menuForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            await apiRequest("/menu/", "POST", { name: document.getElementById("name").value, price: parseFloat(document.getElementById("price").value), category_id: parseInt(document.getElementById("cat").value) });
+            fetchMenu();
+        });
+        fetchMenu();
+    </script>
+</body>
+</html>

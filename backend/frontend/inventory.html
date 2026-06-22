@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Monika G Cafe - Inventory Control</title>
+    <link rel="stylesheet" href="css/main.css">
+    <style>
+        .inventory-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+        .alert-badge {
+            background-color: var(--error);
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: var(--radius-sm);
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar Navigation Shell -->
+    <div class="sidebar" id="sidebar-container"></div>
+    
+    <main class="main-content">
+        <h1>Ingredient Inventory Levels</h1>
+
+        <div class="inventory-grid">
+            <!-- Left Panel: Add New Ingredient -->
+            <div class="card">
+                <h3>Register New Raw Ingredient</h3>
+                <form id="invForm">
+                    <div class="form-group">
+                        <label for="iname">Ingredient Name</label>
+                        <input type="text" id="iname" placeholder="e.g. Coffee Beans" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="lvl">Initial Stock Level</label>
+                        <input type="number" step="0.01" id="lvl" placeholder="0.00" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="thr">Low Stock Threshold Limit</label>
+                        <input type="number" step="0.01" id="thr" placeholder="e.g. 5.00" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="unit">Unit Type</label>
+                        <input type="text" id="unit" value="kg" placeholder="e.g. kg, Liters, Units" required>
+                    </div>
+                    <button type="submit" class="btn">Register Stock Item</button>
+                </form>
+            </div>
+
+            <!-- Right Panel: Restock Existing Materials Dynamically -->
+            <div class="card">
+                <h3>Quick Ingredient Restock</h3>
+                <form id="restockForm">
+                    <div class="form-group">
+                        <label for="restockId">Ingredient ID</label>
+                        <input type="number" id="restockId" placeholder="e.g. 1" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="restockAmount">Restock Amount to Add</label>
+                        <input type="number" step="0.01" id="restockAmount" placeholder="0.00" required>
+                    </div>
+                    <button type="submit" class="btn btn-accent">Apply Restock</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- System Alerts Monitoring Desk Section -->
+        <div class="card">
+            <h3>⚠️ Low Stock Monitor & Active Alerts</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Ingredient Name</th>
+                        <th>Current Level</th>
+                        <th>Threshold Limit</th>
+                        <th>Unit</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="alertGrid">
+                    <tr>
+                        <td colspan="6" style="text-align: center; color: var(--text-secondary);">Loading stock alert ledger...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <!-- Structural Framework Execution Libraries -->
+    <script src="js/api.js"></script>
+    <script src="js/sidebar.js"></script>
+    <script>
+        // 1. Fetch and Display Active Low-Stock Alerts from /inventory/alerts
+        async function fetchStockAlerts() {
+            const data = await apiRequest("/inventory/alerts");
+            const grid = document.getElementById("alertGrid");
+            
+            if (data && !data.error) {
+                if (data.length === 0) {
+                    grid.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--success); font-weight: 500;">✓ All ingredient stocks are at safe operational levels.</td></tr>`;
+                } else {
+                    grid.innerHTML = data.map(item => `
+                        <tr>
+                            <td>#${item.ingredient_id}</td>
+                            <td><strong>${item.name}</strong></td>
+                            <td style="color: var(--error); font-weight: 600;">${item.stock_level}</td>
+                            <td>${item.low_stock_threshold}</td>
+                            <td>${item.unit}</td>
+                            <td><span class="alert-badge">LOW STOCK</span></td>
+                        </tr>
+                    `).join("");
+                }
+            } else {
+                grid.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--error);">Failed to fetch stock status charts.</td></tr>`;
+            }
+        }
+
+        // 2. Submit Event Handler to Register an Ingredient via POST /inventory/ingredients
+        document.getElementById("invForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            
+            const payload = { 
+                name: document.getElementById("iname").value, 
+                stock_level: parseFloat(document.getElementById("lvl").value) || 0.0, 
+                low_stock_threshold: parseFloat(document.getElementById("thr").value) || 0.0, 
+                unit: document.getElementById("unit").value,
+                supplier_id: null // Explicitly matching schema expectations seamlessly
+            };
+            
+            const res = await apiRequest("/inventory/ingredients", "POST", payload);
+            if (res && !res.error) {
+                alert("New ingredient recorded into system registry successfully!");
+                document.getElementById("invForm").reset();
+                fetchStockAlerts(); // Refresh table alerts display mapping
+            } else {
+                alert("Inventory Error: " + (typeof res?.detail === 'object' ? JSON.stringify(res.detail) : res?.detail));
+            }
+        });
+
+        // 3. Submit Event Handler to Restock an Ingredient via PATCH /inventory/ingredients/{id}/restock
+        document.getElementById("restockForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            
+            const id = parseInt(document.getElementById("restockId").value);
+            const amount = parseFloat(document.getElementById("restockAmount").value) || 0.0;
+            
+            // Appends endpoint parameters precisely as requested by PATCH /inventory/ingredients/{id}/restock
+            const res = await apiRequest(`/inventory/ingredients/${id}/restock?amount=${amount}`, "PATCH");
+            
+            if (res && !res.error) {
+                alert(`Stock replenished successfully! New calculated stock level: ${res.new_level}`);
+                document.getElementById("restockForm").reset();
+                fetchStockAlerts(); // Refresh monitor row metrics immediately
+            } else {
+                alert("Restock Action Failed: " + (typeof res?.detail === 'object' ? JSON.stringify(res.detail) : res?.detail));
+            }
+        });
+
+        // Initialize monitoring dashboard tables on browser layout render
+        fetchStockAlerts();
+    </script>
+</body>
+</html>

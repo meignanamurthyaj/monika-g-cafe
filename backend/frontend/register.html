@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monika G Cafe - Register</title>
+    <link rel="stylesheet" href="css/main.css">
+</head>
+<body class="auth-body">
+    <div class="auth-card">
+        <div class="auth-header">
+            <div class="auth-logo">☕</div>
+            <h2>Monika G Cafe</h2>
+            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.25rem;">Create Operations Account</p>
+        </div>
+
+        <form id="regForm">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label for="fn">First Name</label>
+                    <input type="text" id="fn" placeholder="Monika" required>
+                </div>
+                <div class="form-group">
+                    <label for="ln">Last Name</label>
+                    <input type="text" id="ln" placeholder="G" required>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" placeholder="name@example.com" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" placeholder="••••••••" required>
+            </div>
+
+            <div class="form-group">
+                <label for="role_id">System Role</label>
+                <select id="role_id">
+                    <option value="1">Admin</option>
+                    <option value="2">Manager</option>
+                    <option value="3">Staff</option>
+                    <option value="4" selected>Customer</option>
+                </select>
+            </div>
+
+            <button type="submit" class="btn" style="width: 100%; margin-top: 0.5rem;">Create Account</button>
+        </form>
+
+        <p style="text-align: center; margin-top: 1.5rem; font-size: 0.9rem;">
+            <span style="color: var(--text-secondary)">Already have an account?</span> 
+            <a href="login.html" style="color: var(--accent); font-weight: 600; text-decoration: none; margin-left: 0.25rem;">Sign In</a>
+        </p>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script>
+        document.getElementById("regForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            
+            const data = { 
+                first_name: document.getElementById("fn").value, 
+                last_name: document.getElementById("ln").value, 
+                email: document.getElementById("email").value, 
+                password: document.getElementById("password").value, 
+                role_id: parseInt(document.getElementById("role_id").value) 
+            };
+            
+            const res = await apiRequest("/auth/register", "POST", data);
+            
+            // Check if registration was successful
+            if (res && res.user_id) { 
+                alert("Registration complete! Please log in."); 
+                window.location.href = "login.html"; 
+            } else if (res && res.error) {
+                alert("Registration failed: " + res.detail);
+            } else if (res && res.detail) {
+                if (typeof res.detail === 'object') {
+                    const errorMessages = res.detail.map(err => `${err.loc[1] || 'Field'}: ${err.msg}`).join("\n");
+                    alert("Validation Error:\n" + errorMessages);
+                } else {
+                    alert(res.detail);
+                }
+            } else {
+                alert("An unexpected system interruption occurred.");
+            }
+        });
+    </script>
+</body>
+</html>

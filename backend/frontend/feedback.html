@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monika G Cafe - Feedback</title>
+    <link rel="stylesheet" href="css/main.css">
+    <style>
+        .feedback-workspace {
+            display: grid;
+            grid-template-columns: 340px 1fr;
+            gap: 2rem;
+            align-items: start;
+        }
+        .rating-stars { color: var(--accent); font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="sidebar" id="sidebar-container"></div>
+    
+    <main class="main-content">
+        <h1>Guest Feedback Reviews</h1>
+        <p style="color: var(--text-secondary); margin-top: -1.5rem; margin-bottom: 2rem;">
+            Log customer reviews, monitor service metrics, and analyze recorded scores.
+        </p>
+
+        <div class="feedback-workspace">
+            <!-- Left Side: Form Submission Panel -->
+            <div class="card">
+                <h3>Log Review</h3>
+                <form id="feedForm" style="margin-top: 1rem;">
+                    <div class="form-group">
+                        <label for="fcid">Customer User ID</label>
+                        <input type="number" id="fcid" placeholder="e.g. 1" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="rate">Performance Rating (1-5)</label>
+                        <input type="number" id="rate" min="1" max="5" placeholder="5" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="comment">Experience Comments</label>
+                        <textarea id="comment" rows="4" placeholder="Type customer remarks here..."></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-accent" style="width: 100%;">Log Review</button>
+                </form>
+            </div>
+
+            <!-- Right Side: Live Feedback Ledger -->
+            <div class="card">
+                <h3>Historical Review Roster</h3>
+                <div class="table-responsive-wrapper" style="width: 100%; overflow-x: auto; margin-top: 1rem;">
+                    <table style="min-width: 600px;">
+                        <thead>
+                            <tr>
+                                <th>Feedback ID</th>
+                                <th>Cust ID</th>
+                                <th>Rating</th>
+                                <th>Comments</th>
+                                <th>Logged Date</th>
+                            </tr>
+                        </thead>
+                        <tbody id="feedbackGrid">
+                            <tr><td colspan="5" style="text-align: center; color: var(--text-secondary);">Loading records...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="js/api.js"></script>
+    <script src="js/sidebar.js"></script>
+    <script>
+        async function fetchFeedbacks() {
+            const data = await apiRequest("/feedback/");
+            const grid = document.getElementById("feedbackGrid");
+            
+            if (data && !data.error) {
+                if (data.length === 0) {
+                    grid.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-secondary);">No reviews submitted yet.</td></tr>`;
+                } else {
+                    grid.innerHTML = data.map(f => `
+                        <tr>
+                            <td>#${f.feedback_id}</td>
+                            <td>User #${f.customer_id}</td>
+                            <td class="rating-stars">${"★".repeat(f.rating)}${"☆".repeat(5 - f.rating)}</td>
+                            <td><span style="color: var(--text-primary); font-style: italic;">"${f.comments || 'No comment text left.'}"</span></td>
+                            <td>${new Date(f.created_at).toLocaleDateString()}</td>
+                        </tr>
+                    `).join("");
+                }
+            } else {
+                grid.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--error);">Failed to read data lines.</td></tr>`;
+            }
+        }
+
+        document.getElementById("feedForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const payload = { 
+                customer_id: parseInt(document.getElementById("fcid").value), 
+                rating: parseInt(document.getElementById("rate").value), 
+                comments: document.getElementById("comment").value,
+                order_id: null 
+            };
+            
+            const res = await apiRequest("/feedback/", "POST", payload);
+            if (res && !res.error) {
+                alert("Feedback recorded successfully!");
+                document.getElementById("feedForm").reset();
+                fetchFeedbacks();
+            } else {
+                alert("Failed to submit feedback. Ensure Customer ID exists.");
+            }
+        });
+
+        fetchFeedbacks();
+    </script>
+</body>
+</html>

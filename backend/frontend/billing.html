@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Monika G Cafe - Billing & Invoice</title>
+    <link rel="stylesheet" href="css/main.css">
+    <style>
+        /* Invoice Pop-out styling configured to match your custom design theme */
+        .invoice-box {
+            margin-top: 2rem;
+            padding: 2rem;
+            border: 1px dashed var(--accent);
+            background: var(--bg-secondary);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            display: none; /* Hidden until transaction completes */
+        }
+        .invoice-header {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 1rem;
+            margin-bottom: 1rem;
+        }
+        .invoice-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+        .invoice-details {
+            margin-bottom: 1.5rem;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+        .invoice-total-row {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--accent-hover);
+            margin-top: 1rem;
+            border-top: 1px solid var(--border-color);
+            padding-top: 0.5rem;
+            text-align: right;
+        }
+        .print-btn {
+            margin-top: 1rem;
+            width: 100%;
+        }
+        @media print {
+            body * { display: none; }
+            .invoice-box, .invoice-box * { display: block; }
+            .invoice-box { border: none; background: white; color: black; position: absolute; left: 0; top: 0; }
+            .print-btn { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation Container -->
+    <div class="sidebar" id="sidebar-container"></div>
+    
+    <main class="main-content">
+        <h1>Checkout Window</h1>
+        
+        <div class="card">
+            <h3>Process Customer Invoice</h3>
+            <form id="billForm">
+                <div class="form-group">
+                    <label for="oid">Order ID</label>
+                    <input type="number" id="oid" placeholder="e.g. 1" required>
+                </div>
+                <div class="form-group">
+                    <label for="tot">Total Amount ($)</label>
+                    <input type="number" step="0.01" id="tot" placeholder="0.00" required>
+                </div>
+                <div class="form-group">
+                    <label for="method">Payment Method</label>
+                    <select id="method">
+                        <option value="UPI">UPI</option>
+                        <option value="Cash">Cash</option>
+                        <option value="Card">Credit/Debit Card</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-accent">Process Payment & Generate Invoice</button>
+            </form>
+        </div>
+
+        <!-- 🧾 Dynamic Digital Invoice Template Container -->
+        <div class="invoice-box" id="invoiceContainer">
+            <div class="invoice-header">
+                <div>
+                    <div class="invoice-title">☕ MONIKA G CAFE</div>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary);">Operations Hub Invoice Gateway</p>
+                </div>
+                <div style="text-align: right;">
+                    <h4 style="color: var(--accent);">INVOICE RECEIPT</h4>
+                    <p id="invDate" style="font-size: 0.85rem; color: var(--text-secondary);"></p>
+                </div>
+            </div>
+            
+            <div class="invoice-details">
+                <p><strong>Order Reference ID:</strong> #<span id="invOrderId"></span></p>
+                <p><strong>Payment Strategy:</strong> <span id="invMethod"></span></p>
+                <p><strong>Payment Status:</strong> <span style="color: var(--success); font-weight: bold;">PAID</span></p>
+            </div>
+
+            <table style="margin-top: 1rem; width: 100%;">
+                <thead>
+                    <tr>
+                        <th>Description</th>
+                        <th style="text-align: right;">Total Allocation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Cafe Dining Order Subtotal Items Gross</td>
+                        <td style="text-align: right;" id="invSubtotal">$0.00</td>
+                    </tr>
+                    <tr>
+                        <td>GST / System Taxes (0.00%)</td>
+                        <td style="text-align: right;">$0.00</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="invoice-total-row">
+                Grand Total Amount Paid: <span id="invGrandTotal">$0.00</span>
+            </div>
+
+            <button class="btn btn-secondary print-btn" onclick="window.print()">🖨️ Print / Download Invoice PDF</button>
+        </div>
+    </main>
+
+    <!-- Structural Utility Wrappers -->
+    <script src="js/api.js"></script>
+    <script src="js/sidebar.js"></script>
+    <script>
+        document.getElementById("billForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            
+            const amount = parseFloat(document.getElementById("tot").value) || 0.0;
+            const orderId = parseInt(document.getElementById("oid").value);
+            const method = document.getElementById("method").value;
+            
+            const payload = { 
+                order_id: orderId, 
+                subtotal: amount, 
+                tax_amount: 0.0, 
+                discount_applied: 0.0, 
+                total_amount: amount, 
+                payment_method: method 
+            };
+            
+            const res = await apiRequest("/billing/", "POST", payload);
+            
+            if (res && !res.error) {
+                alert("Transaction completed successfully!");
+                
+                // Populating and rendering the invoice data container dynamically
+                document.getElementById("invOrderId").innerText = orderId;
+                document.getElementById("invMethod").innerText = method;
+                document.getElementById("invSubtotal").innerText = `$${amount.toFixed(2)}`;
+                document.getElementById("invGrandTotal").innerText = `$${amount.toFixed(2)}`;
+                document.getElementById("invDate").innerText = new Date().toLocaleString();
+                
+                // Display the invoice template cleanly on screen
+                document.getElementById("invoiceContainer").style.display = "block";
+                
+                // Reset form fields
+                document.getElementById("billForm").reset();
+            } else {
+                alert("Billing Error: " + (typeof res?.detail === 'object' ? JSON.stringify(res.detail) : res?.detail));
+                document.getElementById("invoiceContainer").style.display = "none";
+            }
+        });
+    </script>
+</body>
+</html>

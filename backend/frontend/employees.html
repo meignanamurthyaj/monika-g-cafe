@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monika G Cafe - Employees</title>
+    <link rel="stylesheet" href="css/main.css">
+    <style>
+        /* Enhanced structure for clean visual layout split */
+        .management-workspace {
+            display: grid;
+            grid-template-columns: 340px 1fr;
+            gap: 2rem;
+            align-items: start;
+        }
+
+        /* 📜 CRITICAL FIX: Scroll wrapper to ensure full visibility on small screens */
+        .table-responsive-wrapper {
+            width: 100%;
+            overflow-x: auto;
+            margin-top: 1rem;
+            border-radius: var(--radius-sm);
+        }
+
+        /* Ensure min-width keeps columns spread nicely instead of shrinking */
+        .table-responsive-wrapper table {
+            min-width: 700px;
+            margin-top: 0;
+        }
+
+        .action-column {
+            text-align: center;
+            width: 120px;
+        }
+
+        .helper-text {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+
+        .status-badge {
+            background-color: rgba(82, 183, 136, 0.15);
+            color: var(--success);
+            padding: 0.25rem 0.5rem;
+            border-radius: var(--radius-sm);
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <!-- Persistent Core Sidebar Layout -->
+    <div class="sidebar" id="sidebar-container"></div>
+    
+    <!-- Central Workplace Interface -->
+    <main class="main-content">
+        <h1>Staff Roster Management</h1>
+        <p style="color: var(--text-secondary); margin-top: -1.5rem; margin-bottom: 2rem;">
+            Deploy new personnel profiles, modify basic metrics, and track active cafe status history.
+        </p>
+
+        <div class="management-workspace">
+            
+            <!-- Left Panel Column: Add & Modify Interactive Form -->
+            <div class="card">
+                <h3 id="formTitle">Deploy New Profile</h3>
+                <form id="empForm" style="margin-top: 1rem;">
+                    <input type="hidden" id="editingEmpId" value="">
+
+                    <div class="form-group">
+                        <label for="uid">User Account ID</label>
+                        <input type="number" id="uid" placeholder="e.g. 2" required>
+                        <div class="helper-text">The base User ID created during registration.</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="sal">Salary Allocation ($)</label>
+                        <input type="number" step="0.01" id="sal" placeholder="e.g. 2500.00" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="hdate">Hiring Date</label>
+                        <input type="date" id="hdate" required>
+                    </div>
+                    
+                    <button type="submit" id="submitBtn" class="btn btn-accent" style="width: 100%; margin-top: 0.5rem;">
+                        Save Staff Record
+                    </button>
+                    
+                    <button type="button" id="cancelBtn" class="btn btn-secondary" style="width: 100%; margin-top: 0.5rem; display: none;" onclick="resetFormState()">
+                        ❌ Cancel Edit
+                    </button>
+                </form>
+            </div>
+
+            <!-- Right Panel Column: Scrollable Live Directory Table -->
+            <div class="card">
+                <h3>Active Employee Ledger Directory</h3>
+                
+                <!-- Added horizontal scrollbar wrapper guard -->
+                <div class="table-responsive-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Profile Info</th>
+                                <th>Salary</th>
+                                <th>Hired Date</th>
+                                <th>Status</th>
+                                <th class="action-column">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="employeeGrid">
+                            <tr>
+                                <td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 2rem;">
+                                    Loading roster parameters...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Operational Core Application Utilities -->
+    <script src="js/api.js"></script>
+    <script src="js/sidebar.js"></script>
+    <script>
+        async function fetchEmployees() {
+            const data = await apiRequest("/employees/");
+            const grid = document.getElementById("employeeGrid");
+            
+            if (data && !data.error) {
+                if (data.length === 0) {
+                    grid.innerHTML = `
+                        <tr>
+                            <td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 2rem;">
+                                No staff profiles registered in the system yet.
+                            </td>
+                        </tr>`;
+                } else {
+                    grid.innerHTML = data.map(emp => `
+                        <tr>
+                            <td>#${emp.employee_id}</td>
+                            <td>
+                                <strong style="color: var(--text-primary);">${emp.name}</strong>
+                                <div style="font-size: 0.8rem; color: var(--text-secondary);">User ID: ${emp.user_id} | ${emp.email}</div>
+                            </td>
+                            <td>$${parseFloat(emp.salary).toFixed(2)}</td>
+                            <td>${emp.hire_date}</td>
+                            <td><span class="status-badge">${emp.status}</span></td>
+                            <td class="action-column">
+                                <button class="btn btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.8rem;" 
+                                    onclick="triggerEditMode(${emp.employee_id}, ${emp.user_id}, ${emp.salary}, '${emp.hire_date}')">
+                                    ✏️ Modify
+                                </button>
+                            </td>
+                        </tr>
+                    `).join("");
+                }
+            } else {
+                grid.innerHTML = `
+                    <tr>
+                        <td colspan="6" style="text-align: center; color: var(--error); padding: 2rem;">
+                            ⚠️ Failed to retrieve records from employee database grids.
+                        </td>
+                    </tr>`;
+            }
+        }
+
+        function triggerEditMode(empId, userId, salary, hireDate) {
+            document.getElementById("editingEmpId").value = empId;
+            document.getElementById("uid").value = userId;
+            document.getElementById("uid").disabled = true; 
+            document.getElementById("sal").value = salary;
+            document.getElementById("hdate").value = hireDate;
+
+            document.getElementById("formTitle").innerText = "⚙️ Modify Staff Details";
+            document.getElementById("submitBtn").innerText = "Apply Update";
+            document.getElementById("cancelBtn").style.display = "block";
+        }
+
+        function resetFormState() {
+            document.getElementById("editingEmpId").value = "";
+            document.getElementById("uid").disabled = false;
+            document.getElementById("empForm").reset();
+
+            document.getElementById("formTitle").innerText = "Deploy New Profile";
+            document.getElementById("submitBtn").innerText = "Save Staff Record";
+            document.getElementById("cancelBtn").style.display = "none";
+        }
+
+        document.getElementById("empForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            
+            const empId = document.getElementById("editingEmpId").value;
+            const payload = {
+                user_id: parseInt(document.getElementById("uid").value),
+                salary: parseFloat(document.getElementById("sal").value) || 0.0,
+                hire_date: document.getElementById("hdate").value
+            };
+
+            let res;
+            if (empId) {
+                res = await apiRequest(`/employees/${empId}`, "PUT", payload);
+            } else {
+                res = await apiRequest("/employees/", "POST", payload);
+            }
+
+            if (res && !res.error) {
+                alert(empId ? "Employee variables successfully modified!" : "Employee details successfully recorded!");
+                resetFormState();
+                fetchEmployees();
+            } else {
+                alert("Operation Interrupted: " + (typeof res?.detail === 'object' ? JSON.stringify(res.detail) : res?.detail));
+            }
+        });
+
+        fetchEmployees();
+    </script>
+</body>
+</html>
